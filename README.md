@@ -1,36 +1,61 @@
 # cc-buddy-roller
 
-[English](README.en.md) | [简体中文](README.zh-CN.md)
+```
+  ╭──────────────────────────────────╮
+  │  🎰  CC Buddy Roller  🎰        │
+  │  Roll until you get the one.     │
+  ╰──────────────────────────────────╯
 
-A bilingual seed workshop for the virtual pet behind Claude Code's `/buddy` command.
-一个给 Claude Code `/buddy` 命令里的电子宠物用的双语种子工作台。
-
-## What You Get
-
-- A guide-first CLI with `guide`, `hunt`, `inspect`, `preview`, and `stamp`
-- Chinese and English output via `--lang en|zh`
-- Safe config write-back with automatic backup files
-- Split English and Chinese docs for cleaner GitHub browsing
-
-## Quick Taste
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/liuxiaopai-ai/cc-buddy-roller/main/install.sh | bash
-cc-buddy-roller guide
-
-# or run from a clone
-bun buddy.mjs guide --lang zh
-bun buddy.mjs hunt --species dragon --rarity legendary --shiny --limit 2
-bun buddy.mjs inspect --lang en
+     (\___/)    ≋ legendary ≋
+     (  ✦ ✦)    species: dragon
+      / > 🎩    hat: crown
+     "shiny!"   stats: all 90+
 ```
 
-## Runtime
+[English](README.en.md) | [简体中文](README.zh-CN.md)
 
-This project requires [Bun](https://bun.sh) because Claude Code derives buddy traits with `Bun.hash`.
-The one-line installer handles that automatically if Bun is missing.
-For a normal macOS/Linux setup, users usually only need built-in `bash`, `curl`, and `tar`.
+Your Claude Code `/buddy` pet is determined by a seed. Don't like yours? **Roll a new one.**
 
-See the full docs in:
+不满意你的 Claude Code 宠物？**重新抽，直到出货。**
 
-- [README.en.md](README.en.md)
-- [README.zh-CN.md](README.zh-CN.md)
+## 30 Seconds to Your Dream Buddy
+
+```bash
+# Install (auto-installs Bun if needed)
+curl -fsSL https://github.com/liuxiaopai-ai/cc-buddy-roller/raw/refs/heads/main/install.sh | bash
+
+# Start rolling
+cc-buddy-roller guide
+```
+
+## What Can It Do?
+
+| Command | What it does |
+|---|---|
+| `guide` | Interactive gacha — pick filters, roll, preview, apply |
+| `hunt` | Batch search for seeds matching your criteria |
+| `inspect` | See your current buddy |
+| `preview` | Preview any seed before committing |
+| `stamp` | Write a seed into your config (with auto-backup) |
+
+## Roll Examples
+
+```bash
+# I want a shiny legendary dragon
+cc-buddy-roller hunt --species dragon --rarity legendary --shiny
+
+# All stats above 40, epic rarity
+cc-buddy-roller hunt --rarity epic --stat-floor 40
+
+# What do I have right now?
+cc-buddy-roller inspect
+```
+
+## Docs
+
+- [Full English docs →](README.en.md)
+- [完整中文文档 →](README.zh-CN.md)
+
+## License
+
+MIT

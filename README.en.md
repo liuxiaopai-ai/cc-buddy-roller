@@ -1,45 +1,48 @@
 # cc-buddy-roller
 
-A bilingual seed workshop for the virtual pet behind Claude Code's `/buddy` command.
+```
+  ╭──────────────────────────────────╮
+  │  🎰  CC Buddy Roller  🎰        │
+  │  Roll until you get the one.     │
+  ╰──────────────────────────────────╯
+```
 
-The workflow is guide-first, the docs are split by language, and the CLI vocabulary is centered around `guide`, `hunt`, `inspect`, `preview`, and `stamp`.
+> Your Claude Code `/buddy` pet is **not random** — it's derived from a deterministic seed. That means if you know the right seed, you can pick exactly the buddy you want. This tool lets you search millions of seeds to find your perfect companion.
 
-## Overview
+## Why This Exists
 
-`cc-buddy-roller` helps you work with the deterministic seed that drives the virtual pet shown by Claude Code's `/buddy` command.
+When you run `/buddy` in Claude Code, your pet's species, rarity, hat, eyes, shiny status, and stats are all generated from a single seed string. By default, this seed is your `oauthAccount.accountUuid` — so you're stuck with whatever you got.
 
-It can:
+**cc-buddy-roller** lets you:
+- 🔍 Search for seeds that produce the exact traits you want
+- 👀 Preview any buddy before committing
+- ✍️ Write your chosen seed into the config (with automatic backup)
+- 🌐 Use the CLI in English or Chinese
 
-- inspect the active Claude config and show the currently derived buddy
-- preview any seed before you write it
-- hunt for seeds that match a trait combination
-- stamp a chosen seed into the config with an automatic backup
-- switch the interface between English and Chinese with `--lang`
+Think of it as a gacha reroll tool — except you don't need to delete your account.
 
 ## Install
 
-### One-line install
-
-If the user does not already have Bun, use the installer. It installs Bun when needed, refreshes a local copy of the project, and creates a reusable `cc-buddy-roller` launcher.
+### One-line install (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/liuxiaopai-ai/cc-buddy-roller/main/install.sh | bash
+curl -fsSL https://github.com/liuxiaopai-ai/cc-buddy-roller/raw/refs/heads/main/install.sh | bash
 cc-buddy-roller guide
 ```
 
-If `cc-buddy-roller` is not available in the same shell yet, open a new terminal or run:
+**Requirements:** just `bash`, `curl`, and `tar` — the installer handles Bun automatically.
+
+If `cc-buddy-roller` isn't found after install, open a new terminal or run:
 
 ```bash
 export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"
 ```
 
-For the standard install path, the user does not need Bun or Git in advance. The installer handles Bun itself and downloads the source archive directly from GitHub. In practice, the system just needs `bash`, `curl`, and `tar`, which are already present on most macOS and Linux machines.
-
-You can run the installer again later to update the local copy.
+Run the installer again anytime to update.
 
 ### Manual install
 
-You need [Bun](https://bun.sh). Claude Code uses `Bun.hash`, so plain Node.js does not produce matching buddy traits.
+You need [Bun](https://bun.sh) (not Node.js — Claude Code uses `Bun.hash` internally).
 
 ```bash
 curl -fsSL https://bun.sh/install | bash
@@ -48,116 +51,129 @@ cd cc-buddy-roller
 bun buddy.mjs guide
 ```
 
-## Command Model
+## Commands
 
-| Command | Purpose |
-|---|---|
-| `bun buddy.mjs guide` | Guided flow for choosing filters, running the search, and optionally writing a result |
-| `bun buddy.mjs hunt [filters]` | Direct seed search mode |
-| `bun buddy.mjs inspect` | Show the current config path, active seed slot, and derived buddy |
-| `bun buddy.mjs preview <seed>` | Render the buddy for a single seed |
-| `bun buddy.mjs stamp <seed>` | Back up the config and write a seed into the active slot |
+### `guide` — Interactive mode
 
-## Language Support
-
-The CLI supports:
-
-- `--lang en`
-- `--lang zh`
-- `--lang auto`
-
-Examples:
+The recommended way to start. Walks you through picking filters, runs the search, shows results, and optionally writes your favorite to the config.
 
 ```bash
-bun buddy.mjs guide --lang zh
-bun buddy.mjs inspect --lang en
+cc-buddy-roller guide
 ```
 
-## Examples
+### `hunt` — Direct search
+
+Skip the prompts and go straight to searching.
 
 ```bash
-# Guided flow
-bun buddy.mjs guide
+# Find a shiny legendary dragon
+cc-buddy-roller hunt --species dragon --rarity legendary --shiny
 
-# Hunt a shiny legendary dragon and keep two matches
-bun buddy.mjs hunt --species dragon --rarity legendary --shiny --limit 2
+# Find an epic buddy with all stats above 40
+cc-buddy-roller hunt --rarity epic --stat-floor 40
 
-# Require every stat to stay above 40
-bun buddy.mjs hunt --rarity epic --stat-floor 40
+# Keep 5 matches instead of the default
+cc-buddy-roller hunt --species cat --rarity rare --limit 5
+```
 
-# Preview a seed before writing it
-bun buddy.mjs preview 9ab738bf-fb82-40fb-917d-0020259c8408
+### `inspect` — Check your current buddy
 
-# Stamp a seed into the active config
-bun buddy.mjs stamp f853b71e-3774-4bc7-b4a8-4cc0ed266f9f
+Shows your config path, active seed, and what buddy it produces.
 
-# If installed with install.sh, the launcher works too
-cc-buddy-roller inspect --lang en
+```bash
+cc-buddy-roller inspect
+```
+
+### `preview` — Try before you buy
+
+Render the full buddy card for any seed without touching your config.
+
+```bash
+cc-buddy-roller preview 9ab738bf-fb82-40fb-917d-0020259c8408
+```
+
+### `stamp` — Apply a seed
+
+Backs up your config first, then writes the seed.
+
+```bash
+cc-buddy-roller stamp f853b71e-3774-4bc7-b4a8-4cc0ed266f9f
 ```
 
 ## Search Filters
 
-| Flag | Meaning |
+| Flag | What it does |
 |---|---|
-| `--species <name>` | Target species |
-| `--rarity <tier>` | Target rarity |
-| `--eye <char>` | Target eye style |
-| `--hat <name>` | Target hat |
+| `--species <name>` | Target species (e.g., `dragon`, `cat`, `axolotl`) |
+| `--rarity <tier>` | Target rarity (`common`, `uncommon`, `rare`, `epic`, `legendary`) |
+| `--eye <char>` | Target eye style (`·` `✦` `×` `◉` `@` `°`) |
+| `--hat <name>` | Target hat (`crown`, `wizard`, `halo`, etc.) |
 | `--shiny` | Require shiny |
-| `--stat-floor <n>` | Require every stat to be at least `n` |
-| `--limit <n>` | Number of matches to keep |
-| `--tries <n>` | Search budget |
-| `--seed-format <uuid|hex>` | Override seed format |
+| `--stat-floor <n>` | Every stat must be at least this value |
+| `--limit <n>` | How many matches to keep (default: 1) |
+| `--tries <n>` | Search budget — how many seeds to try |
+| `--seed-format <uuid\|hex>` | Override seed format |
 
-## Config Discovery
+## Language
 
-The tool looks for a Claude config in this order:
-
-1. `BUDDY_ROLLER_CONFIG`
-2. `CLAUDE_CONFIG_DIR/.claude.json`
-3. `~/.claude.json`
-4. `~/.claude/.claude.json`
-
-## Seed Model
-
-Buddy traits are derived deterministically from a single seed:
-
-```text
-seed + "friend-2026-401" -> Bun.hash (wyhash) -> SplitMix32 -> traits
+```bash
+cc-buddy-roller guide --lang zh    # Chinese
+cc-buddy-roller guide --lang en    # English
+cc-buddy-roller guide --lang auto  # Auto-detect
 ```
 
-The active seed comes from:
+## The Trait Pool
 
-```text
+| Trait | Possible Values |
+|---|---|
+| **Species** | duck, goose, blob, cat, dragon, octopus, owl, penguin, turtle, snail, ghost, axolotl, capybara, cactus, robot, rabbit, mushroom, chonk |
+| **Rarity** | common (60%), uncommon (25%), rare (10%), epic (4%), legendary (1%) |
+| **Eyes** | `·` `✦` `×` `◉` `@` `°` |
+| **Hats** | none, crown, tophat, propeller, halo, wizard, beanie, tinyduck |
+| **Stats** | DEBUGGING, PATIENCE, CHAOS, WISDOM, SNARK |
+| **Shiny** | yes / no |
+
+## How It Works
+
+Buddy traits are **deterministic** — the same seed always produces the same buddy.
+
+```
+seed + "friend-2026-401" → Bun.hash (wyhash) → SplitMix32 PRNG → traits
+```
+
+The default seed comes from your Claude config:
+
+```
 oauthAccount.accountUuid ?? userID ?? "anon"
 ```
 
-Only the buddy name and personality come from the LLM during `/buddy hatch`. The species, rarity, hat, eye style, shiny flag, and stat rolls are all seed-driven.
+Only the buddy's **name** and **personality** come from the LLM during `/buddy hatch`. Everything else — species, rarity, hat, eyes, shiny, stats — is seed-driven.
 
-## Trait Palette
+## Config Discovery
 
-| Trait | Values |
+The tool looks for your Claude config in this order:
+
+1. `$BUDDY_ROLLER_CONFIG` (env var override)
+2. `$CLAUDE_CONFIG_DIR/.claude.json`
+3. `~/.claude.json`
+4. `~/.claude/.claude.json`
+
+## Legacy Aliases
+
+If you've seen older docs, these still work:
+
+| Old | New |
 |---|---|
-| Species | duck, goose, blob, cat, dragon, octopus, owl, penguin, turtle, snail, ghost, axolotl, capybara, cactus, robot, rabbit, mushroom, chonk |
-| Rarity | common, uncommon, rare, epic, legendary |
-| Eyes | `·` `✦` `×` `◉` `@` `°` |
-| Hats | none, crown, tophat, propeller, halo, wizard, beanie, tinyduck |
-| Stats | DEBUGGING, PATIENCE, CHAOS, WISDOM, SNARK |
+| `search` | `hunt` |
+| `current`, `show` | `inspect` |
+| `check`, `peek` | `preview` |
+| `apply`, `write` | `stamp` |
 
-## Compatibility Aliases
+## Good to Know
 
-The repo documents a new command shape, but it still accepts a few legacy aliases:
-
-- `search` -> `hunt`
-- `current` or `show` -> `inspect`
-- `check` or `peek` -> `preview`
-- `apply` or `write` -> `stamp`
-
-## Notes
-
-- Claude Code may refresh `oauthAccount.accountUuid` during auth updates, which can revert the buddy.
-- The derivation logic here is based on Claude Code 2.1.89 behavior and may drift if Anthropic changes the salt or generation path.
-- `stamp` always creates a timestamped backup before editing the config.
+- Claude Code may refresh `oauthAccount.accountUuid` during auth updates — this can revert your buddy. Just `stamp` again.
+- The derivation logic matches Claude Code **2.1.89**. If Anthropic changes the salt or generation path, results may shift.
+- `stamp` always creates a timestamped backup before editing anything.
 
 ## License
 

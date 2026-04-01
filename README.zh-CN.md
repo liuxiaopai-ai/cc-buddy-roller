@@ -23,7 +23,7 @@
 如果很多用户本机还没有 Bun，推荐直接用安装脚本。它会在需要时自动安装 Bun，把项目源码同步到本地，并生成一个可重复使用的 `cc-buddy-roller` 启动命令。
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/liuxiaopai-ai/cc-buddy-roller/main/install.sh | bash
+curl -fsSL https://github.com/liuxiaopai-ai/cc-buddy-roller/raw/refs/heads/main/install.sh | bash
 cc-buddy-roller guide
 ```
 
