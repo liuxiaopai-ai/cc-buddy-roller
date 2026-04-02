@@ -184,6 +184,8 @@ const COPY = {
     seedField: "Seed field",
     seedValue: "Seed value",
     seedFormat: "Seed format",
+    hashMode: "Hash mode",
+    hashModeSource: "Hash mode source",
     companionName: "Companion name",
     companionPersonality: "Companion personality",
     attempts: "attempts",
@@ -252,6 +254,8 @@ const COPY = {
     seedField: "种子字段",
     seedValue: "种子值",
     seedFormat: "种子格式",
+    hashMode: "哈希模式",
+    hashModeSource: "哈希来源",
     companionName: "伙伴名字",
     companionPersonality: "伙伴性格",
     attempts: "次尝试",
@@ -318,6 +322,34 @@ function bunHash(input) {
   return Number(BigInt(Bun.hash(input)) & 0xffffffffn)
 }
 
+function fnv1aHash(input) {
+  let hash = 2166136261
+  for (let index = 0; index < input.length; index++) {
+    hash ^= input.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
+
+function resolveHashMode(configData) {
+  const raw = (process.env.CC_BUDDY_HASH_MODE || "auto").trim().toLowerCase()
+  if (raw === "bun" || raw === "wyhash") return { mode: "bun", source: `env:${raw}` }
+  if (raw === "fnv1a" || raw === "node") return { mode: "fnv1a", source: `env:${raw}` }
+  if (raw !== "" && raw !== "auto") fatal(`  CC_BUDDY_HASH_MODE expects auto, bun, or fnv1a (got ${raw})`)
+
+  const installMethod = configData?.installMethod
+  if (installMethod === "global" || installMethod === "local") {
+    return { mode: "fnv1a", source: `config:installMethod=${installMethod}` }
+  }
+  if (installMethod === "native") return { mode: "bun", source: "config:installMethod=native" }
+  return { mode: "bun", source: "default:bun" }
+}
+
+function hash32(input, mode) {
+  if (mode === "fnv1a") return fnv1aHash(input)
+  return bunHash(input)
+}
+
 function splitmix32(seed) {
   let state = seed >>> 0
   return function next() {
@@ -356,8 +388,8 @@ function rollStats(rng, rarity) {
   return stats
 }
 
-function deriveBuddy(seed) {
-  const rng = splitmix32(bunHash(seed + SALT))
+function deriveBuddy(seed, hashMode = "bun") {
+  const rng = splitmix32(hash32(seed + SALT, hashMode))
   const rarity = rollRarity(rng)
   const species = pick(rng, SPECIES)
   const eye = pick(rng, EYES)
@@ -524,12 +556,14 @@ function printProfileCard(profile, locale, options = {}) {
   console.log()
 }
 
-function printConfigContext(bundle, info, locale) {
+function printConfigContext(bundle, info, hashContext, locale) {
   console.log(`  ${COLOR.bold}${tr(locale, "configDetails")}${COLOR.reset}`)
   console.log(`  ${COLOR.dim}${tr(locale, "configPath")}: ${bundle.path}${COLOR.reset}`)
   console.log(`  ${COLOR.dim}${tr(locale, "seedField")}: ${info.source}${COLOR.reset}`)
   console.log(`  ${COLOR.dim}${tr(locale, "seedValue")}: ${info.value}${COLOR.reset}`)
   console.log(`  ${COLOR.dim}${tr(locale, "seedFormat")}: ${info.format}${COLOR.reset}`)
+  console.log(`  ${COLOR.dim}${tr(locale, "hashMode")}: ${hashContext.mode}${COLOR.reset}`)
+  console.log(`  ${COLOR.dim}${tr(locale, "hashModeSource")}: ${hashContext.source}${COLOR.reset}`)
 
   if (bundle.data?.companion?.name) {
     console.log(`  ${COLOR.dim}${tr(locale, "companionName")}: ${bundle.data.companion.name}${COLOR.reset}`)
@@ -647,14 +681,23 @@ async function askConfirm(prompt, locale, label) {
 
 function searchSeeds(filters, locale) {
   let seedFormat = filters.seedFormat
+  let hashContext = null
 
-  if (!seedFormat) {
+  if (!seedFormat || !filters.hashMode) {
     const bundle = readConfigBundle()
     const info = detectSeedSlot(bundle.data)
-    seedFormat = info.format
+    if (!seedFormat) seedFormat = info.format
+    hashContext = filters.hashMode
+      ? { mode: filters.hashMode, source: "cli:--hash-mode" }
+      : resolveHashMode(bundle.data)
     if (bundle.path) {
       console.log(`  ${COLOR.dim}${tr(locale, "detectedFormat")}: ${info.source} -> ${info.format}${COLOR.reset}`)
     }
+  }
+  if (!hashContext) {
+    hashContext = filters.hashMode
+      ? { mode: filters.hashMode, source: "cli:--hash-mode" }
+      : resolveHashMode(null)
   }
 
   const generateSeed = seedFormat === "hex" ? randomHex64 : randomUUID
@@ -662,6 +705,7 @@ function searchSeeds(filters, locale) {
 
   console.log(`\n  ${COLOR.bold}${tr(locale, "searchBrief")}${COLOR.reset}`)
   console.log(`  ${COLOR.dim}${tr(locale, "detectedFormat")}: ${seedFormat}${COLOR.reset}`)
+  console.log(`  ${COLOR.dim}${tr(locale, "hashMode")}: ${hashContext.mode}${COLOR.reset}`)
   console.log(`  ${COLOR.dim}${tr(locale, "filters")}: ${filterSummary || tr(locale, "any")}${COLOR.reset}`)
   console.log(`  ${COLOR.dim}${tr(locale, "budget")}: ${formatNumber(locale, filters.tries)}${COLOR.reset}`)
   console.log(`  ${COLOR.dim}${tr(locale, "requested")}: ${filters.limit}${COLOR.reset}`)
@@ -684,7 +728,7 @@ function searchSeeds(filters, locale) {
     }
 
     const seed = generateSeed()
-    const rng = splitmix32(bunHash(seed + SALT))
+    const rng = splitmix32(hash32(seed + SALT, hashContext.mode))
 
     const rarity = rollRarity(rng)
     if (filters.rarity && rarity !== filters.rarity) continue
@@ -735,10 +779,11 @@ function runInspect(locale) {
   validateConfigPresence(bundle, locale)
 
   const info = detectSeedSlot(bundle.data)
-  const profile = deriveBuddy(info.value)
+  const hashContext = resolveHashMode(bundle.data)
+  const profile = deriveBuddy(info.value, hashContext.mode)
 
   console.log(`\n  ${COLOR.bold}${tr(locale, "inspectTitle")}${COLOR.reset}`)
-  printConfigContext(bundle, info, locale)
+  printConfigContext(bundle, info, hashContext, locale)
   printProfileCard(profile, locale, { title: tr(locale, "currentSnapshot") })
 
   if (info.source === "oauthAccount.accountUuid") {
@@ -748,10 +793,14 @@ function runInspect(locale) {
 }
 
 function runPreview(seed, locale) {
-  const profile = deriveBuddy(seed)
+  const bundle = readConfigBundle()
+  const hashContext = resolveHashMode(bundle.data)
+  const profile = deriveBuddy(seed, hashContext.mode)
   printProfileCard(profile, locale, {
     title: tr(locale, "previewTitle"),
-    caption: isZh(locale) ? `输入种子：${seed}` : `Input seed: ${seed}`,
+    caption: isZh(locale)
+      ? `输入种子：${seed}（${tr(locale, "hashMode")}=${hashContext.mode}）`
+      : `Input seed: ${seed} (${tr(locale, "hashMode")}=${hashContext.mode})`,
   })
 }
 
@@ -763,11 +812,12 @@ function runStamp(seed, locale) {
   if (format === "unknown") fatal(`  ${tr(locale, "badSeed")}`)
 
   const info = detectSeedSlot(bundle.data)
+  const hashContext = resolveHashMode(bundle.data)
   if (info.format !== format) fatal(`  ${tr(locale, "formatError")} (${info.format} expected, got ${format})`)
 
-  const profile = deriveBuddy(seed)
+  const profile = deriveBuddy(seed, hashContext.mode)
   console.log(`\n  ${COLOR.bold}${tr(locale, "stampTitle")}${COLOR.reset}`)
-  printConfigContext(bundle, info, locale)
+  printConfigContext(bundle, info, hashContext, locale)
   printProfileCard(profile, locale)
 
   const backupPath = `${bundle.path}.backup-${Date.now()}`
@@ -796,9 +846,10 @@ async function runGuide(locale) {
     const bundle = readConfigBundle()
     if (bundle.path) {
       const info = detectSeedSlot(bundle.data)
-      const current = deriveBuddy(info.value)
+      const hashContext = resolveHashMode(bundle.data)
+      const current = deriveBuddy(info.value, hashContext.mode)
       const brief = `${localizedLabel(locale, RARITY_META, current.rarity)} ${localizedLabel(locale, SPECIES_META, current.species)}${current.shiny ? ` (${isZh(locale) ? "闪光" : "shiny"})` : ""}`
-      console.log(`\n  ${COLOR.dim}${tr(locale, "currentSnapshot")}: ${brief} via ${info.source}${COLOR.reset}`)
+      console.log(`\n  ${COLOR.dim}${tr(locale, "currentSnapshot")}: ${brief} via ${info.source}, ${tr(locale, "hashMode")}=${hashContext.mode}${COLOR.reset}`)
     }
 
     const filters = {}
@@ -923,6 +974,7 @@ ${COLOR.bold}${tr(locale, "tuning")}:${COLOR.reset}
   --limit <n>           ${isZh(locale) ? "保留多少个结果（默认 3）" : "how many matches to keep (default 3)"}
   --tries <n>           ${isZh(locale) ? "最大尝试次数（默认 10,000,000）" : "max attempts (default 10,000,000)"}
   --seed-format <fmt>   ${isZh(locale) ? "覆盖种子格式：uuid 或 hex" : "override seed format: uuid or hex"}
+  --hash-mode <mode>    ${isZh(locale) ? "覆盖哈希模式：auto、bun、fnv1a" : "override hash mode: auto, bun, fnv1a"}
   --lang <value>        ${tr(locale, "langOption")}
 
 ${COLOR.bold}${tr(locale, "aliases")}:${COLOR.reset}
@@ -978,6 +1030,7 @@ function parseHuntOptions(args, locale) {
     limit: 3,
     tries: 10_000_000,
     seedFormat: null,
+    hashMode: null,
   }
 
   for (let index = 0; index < args.length; index++) {
@@ -1015,6 +1068,12 @@ function parseHuntOptions(args, locale) {
         const value = args[++index]
         if (value !== "uuid" && value !== "hex") fatal(`  ${flag} expects uuid or hex`)
         options.seedFormat = value
+        break
+      }
+      case "--hash-mode": {
+        const value = args[++index]?.toLowerCase()
+        if (!["auto", "bun", "fnv1a"].includes(value)) fatal(`  ${flag} expects auto, bun, or fnv1a`)
+        options.hashMode = value === "auto" ? null : value
         break
       }
       default:
